@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ci-nginx
+  name: examen-devops
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: ci-nginx
+      app: examen
   template:
     metadata:
       labels:
-        app: ci-nginx
+        app: examen
     spec:
       containers:
-        - name: ci-nginx
-          image: moisawade/ci-nginx:dev
+        - name: examen
+          image: rouhou/examen-devops:dev
           ports:
             - containerPort: 80
