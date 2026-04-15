@@ -108,3 +108,14 @@ jobs:
           body: |
             Pipeline terminé
             Status: ${{ job.status }}
+
+  deploy-k8s:
+    if: github.ref == 'refs/heads/k8s'
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Déploiement Kubernetes
+        run: |
+          kubectl apply -f k8s/
