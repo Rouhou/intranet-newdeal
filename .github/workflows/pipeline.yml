@@ -78,7 +78,7 @@ jobs:
 
   deploy:
     if: github.ref == 'refs/heads/prod'
-    runs-on: runner_prod
+    runs-on: prod
     needs: security-prod
 
     steps:
