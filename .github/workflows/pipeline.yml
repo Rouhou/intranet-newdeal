@@ -1,0 +1,103 @@
+name: Examen DevOps Pipeline
+
+on:
+  push:
+    branches:
+      - dev
+      - prod
+
+env:
+  IMAGE_NAME: examen-devops
+  DOCKER_USERNAME: rouhou
+
+jobs:
+
+  build:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: |
+          docker build -t $DOCKER_USERNAME/$IMAGE_NAME:dev \
+            --build-arg BASE_IMAGE=nginx:alpine3.23 .
+
+  scan:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan Filesystem (secrets + vuln)
+        uses: aquasecurity/trivy-action@v0.24.0
+        with:
+          scan-type: fs
+          severity: HIGH,CRITICAL
+          exit-code: 0
+
+  push:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    needs: scan
+
+    steps:
+      - name: Login Docker
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Image
+        run: |
+          docker push $DOCKER_USERNAME/$IMAGE_NAME:dev
+
+  security-prod:
+    if: github.ref == 'refs/heads/prod'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan Image (BLOCK CRITICAL)
+        uses: aquasecurity/trivy-action@v0.24.0
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/$IMAGE_NAME:prod
+          severity: CRITICAL
+          exit-code: 1
+
+  deploy:
+    if: github.ref == 'refs/heads/prod'
+    runs-on: runner_prod
+    needs: security-prod
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy Kubernetes
+        run: |
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+
+    steps:
+      - name: Send Email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.EMAIL_USER }}
+          password: ${{ secrets.EMAIL_PASS }}
+          subject: "Pipeline Status"
+          to: ${{ secrets.EMAIL_DEST }}
+          from: DevSecOps Exam
+          body: |
+            Pipeline terminé
+            Status: ${{ job.status }}
